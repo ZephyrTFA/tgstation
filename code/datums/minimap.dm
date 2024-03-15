@@ -92,13 +92,12 @@ SUBSYSTEM_DEF(minimap)
 	var/started_at //! When the generation of the minimap was queued
 	var/list/datum/minimap_generation_section/sections
 	var/datum/minimap_generation_section/current_section
-
 	var/datum/minimap_data/data //! The data for the minimap
 
 /datum/minimap_generation_section
 	var/section_x
 	var/section_y
-	var/icon/section_blank
+	var/icon/section_blank //! The backing icon all final turf icons are blended into
 	var/list/section_turfs = list()
 
 /datum/controller/subsystem/minimap/Initialize()
@@ -122,7 +121,6 @@ SUBSYSTEM_DEF(minimap)
 
 /// Generates a minimap for the given z level. Does not block and will generate the minimap in the background.
 /datum/controller/subsystem/minimap/proc/generate_minimap_for_z(z, allow_persistence_recovery = FALSE)
-	set waitfor = FALSE
 	PRIVATE_PROC(TRUE)
 
 	var/map_name = splittext(lowertext(SSmapping.config.map_name), " ").Join("-")
@@ -205,10 +203,6 @@ SUBSYSTEM_DEF(minimap)
 		indexable_sections[section_x][section_y].section_turfs += turf
 	cache.sections = sections
 
-#ifdef TESTING
-	cache.started_at = REALTIMEOFDAY
-#endif
-
 	to_generate += cache
 	can_fire = TRUE
 	return TRUE
@@ -233,7 +227,6 @@ SUBSYSTEM_DEF(minimap)
 	var/icon/section_blank = current_section.section_blank
 	var/section_x = current_section.section_x
 	var/section_y = current_section.section_y
-	testing("MINIMAP GEN | [generating.data.z_level] | [current_section.section_x],[current_section.section_y] | [length(current_run)] turfs")
 	while(length(current_run))
 		var/turf/turf = current_run[1]
 		current_run.Cut(1, 2)
@@ -249,10 +242,6 @@ SUBSYSTEM_DEF(minimap)
 	finalize_section()
 
 /datum/controller/subsystem/minimap/proc/finalize()
-#ifdef TESTING
-	testing("MINIMAP GEN | [generating.data.z_level] | DONE | [(REALTIMEOFDAY - generating.started_at) * 0.1]s")
-#endif
-
 	generating.data.minimap_asset = new /datum/asset/simple
 	generating.data.minimap_asset.keep_local_name = TRUE
 	for(var/section_x in 1 to generating.data.section_columns)
@@ -290,26 +279,12 @@ SUBSYSTEM_DEF(minimap)
 					continue
 		things_we_care_about += thing
 
-#ifdef TESTING
-		var/drew_window = FALSE
-		var/drew_door = FALSE
-#endif
-
-		var/list/sorted_things = sort_list(things_we_care_about, GLOBAL_PROC_REF(cmp_obj_minimap_priority))
-		for(var/thing_we_care_about in sorted_things)
-			var/thing_icon = getFlatIcon(thing_we_care_about, no_anim = TRUE)
-			if(thing_icon == null)
-				continue
-			turf_icon.Blend(thing_icon, ICON_OVERLAY)
-
-#ifdef TESTING
-			if(istype(thing_we_care_about, /obj/structure/grille) && (drew_window || drew_door))
-				stack_trace("drew a grille after we drew a window or door!")
-			else if(istype(thing_we_care_about, /obj/machinery/door))
-				drew_door = TRUE
-			else if(istype(thing_we_care_about, /obj/structure/window))
-				drew_window = TRUE
-#endif
+	var/list/sorted_things = sort_list(things_we_care_about, GLOBAL_PROC_REF(cmp_obj_minimap_priority))
+	for(var/thing_we_care_about in sorted_things)
+		var/thing_icon = getFlatIcon(thing_we_care_about, no_anim = TRUE)
+		if(thing_icon == null)
+			continue
+		turf_icon.Blend(thing_icon, ICON_OVERLAY)
 
 	return turf_icon
 
