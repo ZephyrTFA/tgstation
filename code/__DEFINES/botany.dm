@@ -77,10 +77,16 @@
 /// How long to wait between plant age ticks, by default. See [/obj/machinery/hydroponics/var/cycledelay]
 #define HYDROTRAY_CYCLE_DELAY 20 SECONDS
 
-#define HYDROTRAY_NO_PLANT "missing"
-#define HYDROTRAY_PLANT_DEAD "dead"
-#define HYDROTRAY_PLANT_GROWING "growing"
-#define HYDROTRAY_PLANT_HARVESTABLE "harvestable"
+#define HYDROPONICS_PLANT_STATUS_NO_PLANT "missing"
+#define HYDROPONICS_PLANT_STATUS_DEAD "dead"
+#define HYDROPONICS_PLANT_STATUS_GROWING "growing"
+#define HYDROPONICS_PLANT_STATUS_HARVESTABLE "harvestable"
+
+#define OVERLAY_ICONSTATE_LOW_WATER "low-water"
+#define OVERLAY_ICONSTATE_LOW_NUTRIENTS "low-nutrients"
+#define OVERLAY_ICONSTATE_LOW_HEALTH "low-health"
+#define OVERLAY_ICONSTATE_BAD "bad-environment"
+#define OVERLAY_ICONSTATE_HARVESTABLE "harvestable"
 
 /// A list of possible egg laying descriptions
 #define EGG_LAYING_MESSAGES list("lays an egg.","squats down and croons.","begins making a huge racket.","begins clucking raucously.")

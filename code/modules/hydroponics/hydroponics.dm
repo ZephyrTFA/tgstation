@@ -471,50 +471,11 @@
 		return
 	set_light(0)
 
-/obj/machinery/hydroponics/update_name(updates)
-	. = ..()
-	if(myseed)
-		name = "[initial(name)] ([myseed.plantname])"
-	else
-		name = initial(name)
-
 /obj/machinery/hydroponics/update_overlays()
 	. = ..()
-	if(myseed)
-		. += update_plant_overlay()
-		. += update_status_light_overlays()
-
 	if(self_sustaining && self_sustaining_overlay_icon_state)
 		. += mutable_appearance(icon, self_sustaining_overlay_icon_state)
 
-/obj/machinery/hydroponics/proc/update_plant_overlay()
-	var/mutable_appearance/plant_overlay = mutable_appearance(myseed.growing_icon, layer = OBJ_LAYER + 0.01)
-	switch(plant_status)
-		if(HYDROTRAY_PLANT_DEAD)
-			plant_overlay.icon_state = myseed.icon_dead
-		if(HYDROTRAY_PLANT_HARVESTABLE)
-			if(!myseed.icon_harvest)
-				plant_overlay.icon_state = "[myseed.icon_grow][myseed.growthstages]"
-			else
-				plant_overlay.icon_state = myseed.icon_harvest
-		else
-			var/t_growthstate = clamp(round((age / myseed.maturation) * myseed.growthstages), 1, myseed.growthstages)
-			plant_overlay.icon_state = "[myseed.icon_grow][t_growthstate]"
-	plant_overlay.pixel_y = myseed.plant_icon_offset
-	return plant_overlay
-
-/obj/machinery/hydroponics/proc/update_status_light_overlays()
-	. = list()
-	if(waterlevel <= 10)
-		. += mutable_appearance('icons/obj/service/hydroponics/equipment.dmi', "over_lowwater3")
-	if(reagents.total_volume <= 2)
-		. += mutable_appearance('icons/obj/service/hydroponics/equipment.dmi', "over_lownutri3")
-	if(plant_health <= (myseed.endurance / 2))
-		. += mutable_appearance('icons/obj/service/hydroponics/equipment.dmi', "over_lowhealth3")
-	if(weedlevel >= 5 || pestlevel >= 5 || toxic >= 40)
-		. += mutable_appearance('icons/obj/service/hydroponics/equipment.dmi', "over_alert3")
-	if(plant_status == HYDROTRAY_PLANT_HARVESTABLE)
-		. += mutable_appearance('icons/obj/service/hydroponics/equipment.dmi', "over_harvest3")
 
 ///Sets a new value for the myseed variable, which is the seed of the plant that's growing inside the tray.
 /obj/machinery/hydroponics/proc/set_seed(obj/item/seeds/new_seed, delete_old_seed = TRUE)
