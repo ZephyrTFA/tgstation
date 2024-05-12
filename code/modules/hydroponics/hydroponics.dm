@@ -10,38 +10,14 @@
 	obj_flags = CAN_BE_HIT | UNIQUE_RENAME
 	circuit = /obj/item/circuitboard/machine/hydroponics
 	use_power = NO_POWER_USE
-	///The amount of water in the tray (max 100)
-	var/waterlevel = 0
-	///The maximum amount of water in the tray
-	var/maxwater = 100
-	///How many units of nutrients will be drained in the tray.
-	var/nutridrain = 1
-	///The maximum nutrient reagent container size of the tray.
-	var/maxnutri = 20
-	///The amount of pests in the tray (max 10)
-	var/pestlevel = 0
-	///The amount of weeds in the tray (max 10)
-	var/weedlevel = 0
-	///Nutriment's effect on yield
-	var/yieldmod = 1
-	///Nutriment's effect on mutations
-	var/mutmod = 1
-	///Toxicity in the tray?
-	var/toxic = 0
-	///Current age
-	var/age = 0
-	///The status of the plant in the tray. Whether it's harvestable, alive, missing or dead.
-	var/plant_status = HYDROTRAY_NO_PLANT
-	///Its health
-	var/plant_health
+	var/maximum_nutrients = 100
+	var/maximum_water = 100
 	///Last time it was harvested
 	var/lastproduce = 0
 	///Used for timing of cycles.
 	var/lastcycle = 0
 	///About 10 seconds / cycle
 	var/cycledelay = HYDROTRAY_CYCLE_DELAY
-	///The currently planted seed
-	var/obj/item/seeds/myseed
 	///Obtained from the quality of the parts used in the tray, determines nutrient drain rate.
 	var/rating = 1
 	///Can it be unwrenched to move?
@@ -50,106 +26,18 @@
 	var/recent_bee_visit = FALSE
 	///The last user to add a reagent to the tray, mostly for logging purposes.
 	var/datum/weakref/lastuser
-	///If the tray generates nutrients and water on its own
-	var/self_sustaining = FALSE
-	///The icon state for the overlay used to represent that this tray is self-sustaining.
-	var/self_sustaining_overlay_icon_state = "gaia_blessing"
 
 /obj/machinery/hydroponics/Initialize(mapload)
-	//ALRIGHT YOU DEGENERATES. YOU HAD REAGENT HOLDERS FOR AT LEAST 4 YEARS AND NONE OF YOU MADE HYDROPONICS TRAYS HOLD NUTRIENT CHEMS INSTEAD OF USING "Points".
-	//SO HERE LIES THE "nutrilevel" VAR. IT'S DEAD AND I PUT IT OUT OF IT'S MISERY. USE "reagents" INSTEAD. ~ArcaneMusic, accept no substitutes.
-	create_reagents(maxnutri, INJECTABLE)
-	if(mapload)
-		reagents.add_reagent(/datum/reagent/plantnutriment/eznutriment, max(maxnutri / 2, 10)) //Half filled nutrient trays for dirt trays to have more to grow with in prison/lavaland.
-		waterlevel = maxwater
 	. = ..()
+	create_reagents(maximum_nutrients + maximum_water, INJECTABLE)
+	if(!mapload)
+		return .
+	// mapload hydroponics trays start out fully filled
+	reagents.add_reagent(/datum/reagent/plantnutriment/eznutriment, maximum_nutrients)
+	reagents.add_reagent(/datum/reagent/water, maximum_water)
 
-	var/static/list/hovering_item_typechecks = list(
-		/obj/item/plant_analyzer = list(
-			SCREENTIP_CONTEXT_LMB = "Scan tray stats",
-			SCREENTIP_CONTEXT_RMB = "Scan tray chemicals"
-		),
-		/obj/item/cultivator = list(
-			SCREENTIP_CONTEXT_LMB = "Remove weeds",
-		),
-		/obj/item/shovel = list(
-			SCREENTIP_CONTEXT_LMB = "Clear tray",
-		),
-	)
-
-	AddElement(/datum/element/contextual_screentip_item_typechecks, hovering_item_typechecks)
-	register_context()
-
-/obj/machinery/hydroponics/add_context(
-	atom/source,
-	list/context,
-	obj/item/held_item,
-	mob/living/user,
-)
-
-	// If we don't have a seed, we can't do much.
-
-	// The only option is to plant a new seed.
-	if(!myseed)
-		if(istype(held_item, /obj/item/seeds))
-			context[SCREENTIP_CONTEXT_LMB] = "Plant seed"
-			return CONTEXTUAL_SCREENTIP_SET
-		return NONE
-
-	// If we DO have a seed, we can do a few things!
-
-	// With a hand we can harvest or remove dead plants
-	// If the plant's not in either state, we can't do much else, so early return.
-	if(isnull(held_item))
-		// Silicons can't interact with trays :frown:
-		if(HAS_SILICON_ACCESS(user))
-			return NONE
-
-		switch(plant_status)
-			if(HYDROTRAY_PLANT_DEAD)
-				context[SCREENTIP_CONTEXT_LMB] = "Remove dead plant"
-				return CONTEXTUAL_SCREENTIP_SET
-
-			if(HYDROTRAY_PLANT_HARVESTABLE)
-				context[SCREENTIP_CONTEXT_LMB] = "Harvest plant"
-				return CONTEXTUAL_SCREENTIP_SET
-
-		return NONE
-
-	// If the plant is harvestable, we can graft it with secateurs or harvest it with a plant bag.
-	if(plant_status == HYDROTRAY_PLANT_HARVESTABLE)
-		if(istype(held_item, /obj/item/secateurs))
-			context[SCREENTIP_CONTEXT_LMB] = "Graft plant"
-			return CONTEXTUAL_SCREENTIP_SET
-
-		if(istype(held_item, /obj/item/storage/bag/plants))
-			context[SCREENTIP_CONTEXT_LMB] = "Harvest plant"
-			return CONTEXTUAL_SCREENTIP_SET
-
-	// If the plant's in good health, we can shear it.
-	if(istype(held_item, /obj/item/geneshears) && plant_health > GENE_SHEAR_MIN_HEALTH)
-		context[SCREENTIP_CONTEXT_LMB] = "Remove plant gene"
-		return CONTEXTUAL_SCREENTIP_SET
-
-	// If we've got a charged somatoray, we can mutation lock it.
-	if(istype(held_item, /obj/item/gun/energy/floragun) && myseed.endurance > FLORA_GUN_MIN_ENDURANCE && LAZYLEN(myseed.mutatelist))
-		var/obj/item/gun/energy/floragun/flower_gun = held_item
-		if(flower_gun.cell.charge >= flower_gun.cell.maxcharge)
-			context[SCREENTIP_CONTEXT_LMB] = "Lock mutation"
-			return CONTEXTUAL_SCREENTIP_SET
-
-	// Edibles and pills can be composted.
-	if(IS_EDIBLE(held_item) || istype(held_item, /obj/item/reagent_containers/pill))
-		context[SCREENTIP_CONTEXT_LMB] = "Compost"
-		return CONTEXTUAL_SCREENTIP_SET
-
-	// And if a reagent container has water or plant fertilizer in it, we can use it on the plant.
-	if(is_reagent_container(held_item) && length(held_item.reagents.reagent_list))
-		var/datum/reagent/most_common_reagent = held_item.reagents.get_master_reagent()
-		context[SCREENTIP_CONTEXT_LMB] = "[istype(most_common_reagent, /datum/reagent/water) ? "Water" : "Feed"] plant"
-		return CONTEXTUAL_SCREENTIP_SET
-
-	return NONE
+/obj/machinery/hydroponics/proc/on_set_self_sustaining(datum/source, self_sustaining)
+	update_use_power(self_sustaining ? ACTIVE_POWER_USE : NO_POWER_USE)
 
 /obj/machinery/hydroponics/constructable
 	name = "hydroponics tray"
@@ -470,138 +358,6 @@
 		set_light(G.glow_range(myseed), G.glow_power(myseed), G.glow_color)
 		return
 	set_light(0)
-
-/obj/machinery/hydroponics/update_overlays()
-	. = ..()
-	if(self_sustaining && self_sustaining_overlay_icon_state)
-		. += mutable_appearance(icon, self_sustaining_overlay_icon_state)
-
-
-///Sets a new value for the myseed variable, which is the seed of the plant that's growing inside the tray.
-/obj/machinery/hydroponics/proc/set_seed(obj/item/seeds/new_seed, delete_old_seed = TRUE)
-	var/old_seed = myseed
-	myseed = new_seed
-	if(old_seed && delete_old_seed)
-		qdel(old_seed)
-	set_plant_status(new_seed ? HYDROTRAY_PLANT_GROWING : HYDROTRAY_NO_PLANT) //To make sure they can't just put in another seed and insta-harvest it
-	if(myseed && myseed.loc != src)
-		myseed.forceMove(src)
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_SEED, new_seed)
-	update_appearance()
-	if(isnull(myseed))
-		particles = null
-
-/*
- * Setter proc to set a tray to a new self_sustaining state and update all values associated with it.
- *
- * new_value - true / false value that self_sustaining is being set to
- */
-/obj/machinery/hydroponics/proc/set_self_sustaining(new_value)
-	if(self_sustaining == new_value)
-		return
-
-	self_sustaining = new_value
-
-	update_use_power(self_sustaining ? ACTIVE_POWER_USE : NO_POWER_USE)
-	update_appearance()
-
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_SELFSUSTAINING, new_value)
-
-/obj/machinery/hydroponics/proc/set_weedlevel(new_weedlevel, update_icon = TRUE)
-	if(weedlevel == new_weedlevel)
-		return
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_WEEDLEVEL, new_weedlevel)
-	weedlevel = new_weedlevel
-	if(update_icon)
-		update_appearance()
-
-/obj/machinery/hydroponics/proc/set_pestlevel(new_pestlevel, update_icon = TRUE)
-	if(pestlevel == new_pestlevel)
-		return
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_PESTLEVEL, new_pestlevel)
-	pestlevel = new_pestlevel
-	if(update_icon)
-		update_appearance()
-
-/obj/machinery/hydroponics/proc/set_waterlevel(new_waterlevel, update_icon = TRUE)
-	if(waterlevel == new_waterlevel)
-		return
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_WATERLEVEL, new_waterlevel)
-	waterlevel = new_waterlevel
-	if(update_icon)
-		update_appearance()
-
-	var/difference = new_waterlevel - waterlevel
-	if(difference > 0)
-		adjust_toxic(-round(difference/4))//Toxicity dilutation code. The more water you put in, the lesser the toxin concentration.
-
-/obj/machinery/hydroponics/proc/set_plant_health(new_plant_health, update_icon = TRUE, forced = FALSE)
-	if(plant_health == new_plant_health || ((!myseed || plant_status == HYDROTRAY_PLANT_DEAD) && !forced))
-		return
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_PLANT_HEALTH, new_plant_health)
-	plant_health = new_plant_health
-	if(update_icon)
-		update_appearance()
-
-/obj/machinery/hydroponics/proc/set_toxic(new_toxic, update_icon = TRUE)
-	if(toxic == new_toxic)
-		return
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_TOXIC, new_toxic)
-	toxic = new_toxic
-	if(update_icon)
-		update_appearance()
-
-/obj/machinery/hydroponics/proc/set_plant_status(new_plant_status)
-	if(plant_status == new_plant_status)
-		return
-	SEND_SIGNAL(src, COMSIG_HYDROTRAY_SET_PLANT_STATUS, new_plant_status)
-	plant_status = new_plant_status
-
-// The following procs adjust the hydroponics tray variables, and make sure that the stat doesn't go out of bounds.
-
-/**
- * Adjust water.
- * Raises or lowers tray water values by a set value. Adding water will dillute toxicity from the tray.
- * Returns the amount of water actually added/taken
- * * adjustamt - determines how much water the tray will be adjusted upwards or downwards.
- */
-/obj/machinery/hydroponics/proc/adjust_waterlevel(amt)
-	var/initial_waterlevel = waterlevel
-	set_waterlevel(clamp(waterlevel+amt, 0, maxwater), FALSE)
-	return waterlevel-initial_waterlevel
-
-/**
- * Adjust Health.
- * Raises the tray's plant_health stat by a given amount, with total health determined by the seed's endurance.
- * * adjustamt - Determines how much the plant_health will be adjusted upwards or downwards.
- */
-/obj/machinery/hydroponics/proc/adjust_plant_health(amt)
-	set_plant_health(clamp(plant_health + amt, 0, myseed?.endurance), FALSE)
-
-/**
- * Adjust toxicity.
- * Raises the plant's toxic stat by a given amount.
- * * adjustamt - Determines how much the toxic will be adjusted upwards or downwards.
- */
-/obj/machinery/hydroponics/proc/adjust_toxic(amt)
-	set_toxic(clamp(toxic + amt, 0, MAX_TRAY_TOXINS), FALSE)
-
-/**
- * Adjust Pests.
- * Raises the tray's pest level stat by a given amount.
- * * adjustamt - Determines how much the pest level will be adjusted upwards or downwards.
- */
-/obj/machinery/hydroponics/proc/adjust_pestlevel(amt)
-	set_pestlevel(clamp(pestlevel + amt, 0, MAX_TRAY_PESTS), FALSE)
-
-
-/**
- * Adjust Weeds.
- * Raises the plant's weed level stat by a given amount.
- * * adjustamt - Determines how much the weed level will be adjusted upwards or downwards.
- */
-/obj/machinery/hydroponics/proc/adjust_weedlevel (amt)
-	set_weedlevel(clamp(weedlevel + amt, 0, MAX_TRAY_WEEDS), FALSE)
 
 /obj/machinery/hydroponics/examine(user)
 	. = ..()

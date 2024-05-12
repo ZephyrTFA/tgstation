@@ -87,6 +87,7 @@
 #define OVERLAY_ICONSTATE_LOW_HEALTH "low-health"
 #define OVERLAY_ICONSTATE_BAD "bad-environment"
 #define OVERLAY_ICONSTATE_HARVESTABLE "harvestable"
+#define OVERLAY_ICONSTATE_SELF_SUSTAINING "self-sustaining"
 
 /// A list of possible egg laying descriptions
 #define EGG_LAYING_MESSAGES list("lays an egg.","squats down and croons.","begins making a huge racket.","begins clucking raucously.")
