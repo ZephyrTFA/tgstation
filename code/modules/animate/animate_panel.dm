@@ -1,4 +1,7 @@
-GLOBAL_DATUM(animate_panel, /datum/animate_panel)
+GLOBAL_DATUM_INIT(animate_panel, /datum/animate_panel, new)
+
+ADMIN_VERB(animate_panel, R_DEBUG|R_FUN, "Animate Panel", "Panel to view and customize animations.", ADMIN_CATEGORY_FUN)
+	GLOB.animate_panel.ui_interact(user?.mob)
 
 /datum/animate_panel
 	var/static/list/datum/animate_flag/flags
@@ -8,6 +11,16 @@ GLOBAL_DATUM(animate_panel, /datum/animate_panel)
 
 	var/list/cached_targets
 	var/list/datum/animate_chain/animate_chains_by_user
+
+/datum/animate_panel/ui_interact(mob/user, datum/tgui/ui)
+	ui = SStgui.try_update_ui(user, src, ui)
+	if(!ui)
+		ui = new /datum/tgui(user, src, "AnimationDebugPanel")
+		ui.set_autoupdate(FALSE)
+		ui.open()
+
+/datum/animate_panel/ui_state(mob/user)
+	return ADMIN_STATE(R_FUN|R_DEBUG)
 
 /datum/animate_panel/New()
 	..()
@@ -51,6 +64,7 @@ GLOBAL_DATUM(animate_panel, /datum/animate_panel)
 
 	var/list/animate_flags = list()
 	for(var/datum/animate_flag/flag as anything in flags)
+		flag = flags[flag]
 		animate_flags[flag.name] = list(
 			"description" = flag.description,
 			"value" = flag.value,
@@ -59,6 +73,7 @@ GLOBAL_DATUM(animate_panel, /datum/animate_panel)
 
 	var/list/animate_easings = list()
 	for(var/datum/animate_easing/easing as anything in easings)
+		easing = easings[easing]
 		animate_easings[easing.name] = list(
 			"description" = easing.description,
 			"value" = easing.value,
@@ -67,6 +82,7 @@ GLOBAL_DATUM(animate_panel, /datum/animate_panel)
 
 	var/list/animate_easing_flags = list()
 	for(var/datum/animate_easing_flag/easing_flag as anything in easing_flags)
+		easing_flag = easing_flags[easing_flag]
 		animate_easing_flags[easing_flag.name] = list(
 			"description" = easing_flag.description,
 			"value" = easing_flag.value,
@@ -75,6 +91,7 @@ GLOBAL_DATUM(animate_panel, /datum/animate_panel)
 
 	var/list/animate_arguments = list()
 	for(var/datum/animate_argument/argument as anything in arguments)
+		argument = arguments[argument]
 		animate_arguments[argument.name] = list(
 			"description" = argument.description,
 			"allowed_types" = list(),
@@ -88,13 +105,9 @@ GLOBAL_DATUM(animate_panel, /datum/animate_panel)
 /datum/animate_panel/ui_data(mob/user)
 	. = list()
 	.["target"] = cached_targets[ref(user)]
-
-	.["chain"] = list()
 	var/datum/animate_chain/chain = animate_chains_by_user[ref(user)]
-	while(!isnull(chain))
-		.["chain"] += list(chain.serialize_list(list(), list()))
-		chain = chain.next
-
+	if(!isnull(chain))
+		.["chain"] = chain.serialize_list(list(), list())
 	return .
 
 /datum/animate_panel/ui_act(action, list/params, datum/tgui/ui, datum/ui_state/state)
